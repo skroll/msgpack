@@ -5,23 +5,27 @@ set(VERSION "0.5.4")
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 5)
 
+# Generate the version.h file
 configure_file(
 	"${PROJECT_SOURCE_DIR}/src/msgpack/version.h.in"
 	"${PROJECT_BINARY_DIR}/msgpack/version.h"
 )
 
+# Create intermediate directories
 make_directory(${PROJECT_BINARY_DIR}/msgpack)
 make_directory(${PROJECT_BINARY_DIR}/msgpack/type)
 
+# Required for generating headers
 find_package(Ruby REQUIRED)
 
+# Generate the header files from the erb files
 foreach(HDR "zone.hpp" "type/define.hpp" "type/tuple.hpp")
 	execute_process(
 		COMMAND ${RUBY_EXECUTABLE} -r erb -e "puts ERB.new(ARGF.read).result" ${PROJECT_SOURCE_DIR}/src/msgpack/${HDR}.erb
 		OUTPUT_FILE ${PROJECT_BINARY_DIR}/msgpack/${HDR}
 	)
 endforeach(HDR)
-	
+
 include_directories(
 	${PROJECT_BINARY_DIR}
 	${PROJECT_BINARY_DIR}/msgpack
@@ -31,6 +35,7 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/../msgpack
 )
 
+# C Sources
 set(C_SOURCES
 	${PROJECT_SOURCE_DIR}/src/objectc.c
 	${PROJECT_SOURCE_DIR}/src/unpack.c
@@ -56,6 +61,7 @@ set(C_HEADERS_MSGPACK
 	${PROJECT_SOURCE_DIR}/../msgpack/unpack_template.h
 	${PROJECT_BINARY_DIR}/msgpack/version.h)
 
+# C++ Sources
 set(CPP_SOURCES
 	${PROJECT_SOURCE_DIR}/src/object.cpp)
 
@@ -72,7 +78,7 @@ set(CPP_HEADERS_MSGPACK
 	${PROJECT_SOURCE_DIR}/src/msgpack/zbuffer.hpp
 	${PROJECT_BINARY_DIR}/msgpack/zone.hpp)
 
-set(CPP_HEADERS_TYPES
+set(CPP_HEADERS_TYPE
 	${PROJECT_SOURCE_DIR}/src/msgpack/type/bool.hpp
 	${PROJECT_SOURCE_DIR}/src/msgpack/type/deque.hpp
 	${PROJECT_SOURCE_DIR}/src/msgpack/type/fixint.hpp
@@ -93,28 +99,80 @@ set(CPP_HEADERS_TR1
 	${PROJECT_SOURCE_DIR}/src/msgpack/type/tr1/unordered_map.hpp
 	${PROJECT_SOURCE_DIR}/src/msgpack/type/tr1/unordered_set.hpp)
 
-add_library(msgpack
+# Compilation options
+option(MSGPACK_BUILD_STATIC "Build static libraries." ON)
+option(MSGPACK_BUILD_SHARED "Build shared libraries." ON)
+option(MSGPACK_BUILD_CXX    "Build C++ library."      ON)
+
+# Always build C sources
+set(MSGPACK_SOURCES
 	${C_SOURCES}
 	${C_HEADERS}
-	${C_HEADERS_MSGPACK}
-	${CPP_SOURCES}
-	${CPP_HEADERS}
-	${CPP_HEADERS_MSGPACK}
-	${CPP_HEADERS_TYPES}
-	${CPP_HEADERS_TR1}
-)
+	${C_HEADERS_MSGPACK})
 
-install(
-	TARGETS msgpack
-	DESTINATION lib
-)
+# Conditionally build C++ sources
+if(MSGPACK_BUILD_CXX)
+	list(APPEND MSGPACK_SOURCES
+		${CPP_SOURCES}
+		${CPP_HEADERS}
+		${CPP_HEADERS_MSGPACK}
+		${CPP_HEADERS_TYPE}
+		${CPP_HEADERS_TR1})
+endif(MSGPACK_BUILD_CXX)
 
-install(
-	FILES ${C_HEADERS}
-	DESTINATION include
-)
+# Conditionally build static library
+if(MSGPACK_BUILD_STATIC)
+	add_library(msgpack_static STATIC ${MSGPACK_SOURCES})
+	set_target_properties(msgpack_static PROPERTIES
+		OUTPUT_NAME "msgpack"
+		CLEAN_DIRECT_OUTPUT 1)
+	
+	install(TARGETS msgpack_static
+		    DESTINATION lib)
+endif(MSGPACK_BUILD_STATIC)
 
-install(
-	FILES ${C_HEADERS_MSGPACK}
-	DESTINATION include/msgpack
-)
+# Conditionally build shared library
+if(MSGPACK_BUILD_SHARED)
+	add_library(msgpack_shared SHARED ${MSGPACK_SOURCES})
+	set_target_properties(msgpack_shared PROPERTIES
+		OUTPUT_NAME "msgpack"
+		CLEAN_DIRECT_OUTPUT 1)
+	
+	install(TARGETS msgpack_shared
+		    DESTINATION lib)
+endif(MSGPACK_BUILD_SHARED)
+
+# Installation
+if(MSGPACK_BUILD_STATIC OR MSGPACK_BUILD_SHARED)
+	install(
+		FILES ${C_HEADERS}
+		DESTINATION include
+	)
+
+	install(
+		FILES ${C_HEADERS_MSGPACK}
+		DESTINATION include/msgpack
+	)
+
+	if(MSGPACK_BUILD_CXX)
+		install(
+			FILES ${CPP_HEADERS}
+			DESTINATION include
+		)
+	
+		install(
+			FILES ${CPP_HEADERS_MSGPACK}
+			DESTINATION include/msgpack
+		)
+	
+		install(
+			FILES ${CPP_HEADERS_TYPE}
+			DESTINATION include/msgpack/type
+		)
+	
+		install(
+			FILES ${CPP_HEADERS_TR1}
+			DESTINATION include/msgpack/type/tr1
+		)
+	endif(MSGPACK_BUILD_CXX)
+endif(MSGPACK_BUILD_STATIC OR MSGPACK_BUILD_SHARED)
