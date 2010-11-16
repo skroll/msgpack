@@ -15,17 +15,6 @@ configure_file(
 make_directory(${PROJECT_BINARY_DIR}/msgpack)
 make_directory(${PROJECT_BINARY_DIR}/msgpack/type)
 
-# Required for generating headers
-find_package(Ruby REQUIRED)
-
-# Generate the header files from the erb files
-foreach(HDR "zone.hpp" "type/define.hpp" "type/tuple.hpp")
-	execute_process(
-		COMMAND ${RUBY_EXECUTABLE} -r erb -e "puts ERB.new(ARGF.read).result" ${PROJECT_SOURCE_DIR}/src/msgpack/${HDR}.erb
-		OUTPUT_FILE ${PROJECT_BINARY_DIR}/msgpack/${HDR}
-	)
-endforeach(HDR)
-
 include_directories(
 	${PROJECT_BINARY_DIR}
 	${PROJECT_BINARY_DIR}/msgpack
@@ -112,6 +101,17 @@ set(MSGPACK_SOURCES
 
 # Conditionally build C++ sources
 if(MSGPACK_BUILD_CXX)
+	# Required for generating headers
+	find_package(Ruby REQUIRED)
+
+	# Generate the header files from the erb files
+	foreach(HDR "zone.hpp" "type/define.hpp" "type/tuple.hpp")
+		execute_process(
+			COMMAND ${RUBY_EXECUTABLE} -r erb -e "puts ERB.new(ARGF.read).result" ${PROJECT_SOURCE_DIR}/src/msgpack/${HDR}.erb
+			OUTPUT_FILE ${PROJECT_BINARY_DIR}/msgpack/${HDR}
+		)
+	endforeach(HDR)
+	
 	list(APPEND MSGPACK_SOURCES
 		${CPP_SOURCES}
 		${CPP_HEADERS}
